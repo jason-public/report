@@ -1199,6 +1199,38 @@ let lightboxPagesList = [];
 let lightboxPageIndex = 0;
 let lightboxBaseTitle = "";
 
+const SUMMARY_SLIDES_LIST = [
+    'assets/summary/slide_1.jpg',
+    'assets/summary/slide_2.jpg',
+    'assets/summary/slide_3.jpg',
+    'assets/summary/slide_4.jpg',
+    'assets/summary/slide_5.jpg',
+    'assets/summary/slide_6.jpg',
+    'assets/summary/slide_7.jpg',
+    'assets/summary/slide_8.jpg',
+    'assets/summary/slide_9.jpg'
+];
+
+function openSummarySlidesModal() {
+    openLightbox(
+        SUMMARY_SLIDES_LIST[0],
+        '교통국 중점사업 요약 설명 (1/9)',
+        SUMMARY_SLIDES_LIST,
+        0,
+        '교통국 중점사업 요약 설명'
+    );
+}
+
+function openRoadMapModal() {
+    openLightbox(
+        'assets/road_map/road_map.jpg',
+        '교통국 도로 사업 지도',
+        null,
+        0,
+        '교통국 도로 사업 지도'
+    );
+}
+
 function openLightbox(imgSrc, caption, pagesList = null, pageIndex = 0, baseTitle = "") {
     const lightbox = document.getElementById('lightbox-modal');
     const imgEl = document.getElementById('lightbox-img');
@@ -1248,8 +1280,20 @@ function navigateLightboxPage(delta) {
 
     lightboxPageIndex = newIdx;
     const pg = lightboxPagesList[lightboxPageIndex];
-    const pageImgSrc = `assets/pdf_pages/page_${pg}.png`;
-    const caption = `${lightboxBaseTitle} - 원본 PDF 보고서 (P.${pg}) (${lightboxPageIndex + 1}/${lightboxPagesList.length})`;
+    
+    let pageImgSrc = '';
+    let caption = '';
+    let downloadName = '';
+    
+    if (typeof pg === 'string' && (pg.includes('/') || pg.includes('.'))) {
+        pageImgSrc = pg;
+        caption = `${lightboxBaseTitle} (${lightboxPageIndex + 1}/${lightboxPagesList.length})`;
+        downloadName = `${lightboxBaseTitle}_${lightboxPageIndex + 1}.jpg`;
+    } else {
+        pageImgSrc = `assets/pdf_pages/page_${pg}.png`;
+        caption = `${lightboxBaseTitle} - 원본 PDF 보고서 (P.${pg}) (${lightboxPageIndex + 1}/${lightboxPagesList.length})`;
+        downloadName = `${lightboxBaseTitle}_P${pg}.png`;
+    }
 
     const imgEl = document.getElementById('lightbox-img');
     const captionEl = document.getElementById('lightbox-caption');
@@ -1260,9 +1304,9 @@ function navigateLightboxPage(delta) {
 
     imgEl.src = pageImgSrc;
     captionEl.textContent = caption;
-    titleEl.textContent = `${lightboxBaseTitle} - 원본 PDF 보고서 (P.${pg}) 확대보기`;
+    titleEl.textContent = `${caption} 확대보기`;
     downloadLink.href = pageImgSrc;
-    downloadLink.setAttribute('download', `${lightboxBaseTitle}_P${pg}.png`.replace(/[\/\?%*:|"<>]/g, '_'));
+    downloadLink.setAttribute('download', downloadName.replace(/[\/\?%*:|"<>]/g, '_'));
 
     if (prevBtn) prevBtn.disabled = (lightboxPageIndex <= 0);
     if (nextBtn) nextBtn.disabled = (lightboxPageIndex >= lightboxPagesList.length - 1);
@@ -1298,7 +1342,7 @@ function initLightboxInteractions() {
         updateZoomTransform();
     }, { passive: false });
 
-    // Drag to pan
+    // Drag to pan (Mouse)
     stage.addEventListener('mousedown', (e) => {
         if (e.target.closest('.lightbox-toolbar') || e.target.closest('.lightbox-fullscreen-bar') || e.target.closest('.lightbox-nav-btn')) return;
         isDragging = true;
@@ -1319,6 +1363,66 @@ function initLightboxInteractions() {
             isDragging = false;
             stage.classList.remove('dragging');
         }
+    });
+
+    // Touch Events for Tablets & Mobile (Pan, Pinch Zoom, Swipe)
+    let touchStartX = 0;
+    let touchStartY = 0;
+    let initialPinchDist = 0;
+    let initialZoomOnPinch = 1.0;
+    let isTouchDragging = false;
+
+    stage.addEventListener('touchstart', (e) => {
+        if (e.target.closest('.lightbox-toolbar') || e.target.closest('.lightbox-fullscreen-bar') || e.target.closest('.lightbox-nav-btn')) return;
+
+        if (e.touches.length === 1) {
+            isTouchDragging = true;
+            touchStartX = e.touches[0].clientX;
+            touchStartY = e.touches[0].clientY;
+            startX = touchStartX - currentTranslateX;
+            startY = touchStartY - currentTranslateY;
+        } else if (e.touches.length === 2) {
+            isTouchDragging = false;
+            initialPinchDist = Math.hypot(
+                e.touches[0].clientX - e.touches[1].clientX,
+                e.touches[0].clientY - e.touches[1].clientY
+            );
+            initialZoomOnPinch = currentZoom;
+        }
+    }, { passive: true });
+
+    stage.addEventListener('touchmove', (e) => {
+        if (e.touches.length === 1 && isTouchDragging) {
+            currentTranslateX = e.touches[0].clientX - startX;
+            currentTranslateY = e.touches[0].clientY - startY;
+            updateZoomTransform();
+        } else if (e.touches.length === 2 && initialPinchDist > 0) {
+            const dist = Math.hypot(
+                e.touches[0].clientX - e.touches[1].clientX,
+                e.touches[0].clientY - e.touches[1].clientY
+            );
+            const scale = dist / initialPinchDist;
+            currentZoom = Math.min(Math.max(initialZoomOnPinch * scale, 0.5), 4.0);
+            updateZoomTransform();
+        }
+    }, { passive: true });
+
+    stage.addEventListener('touchend', (e) => {
+        if (isTouchDragging && e.changedTouches.length === 1) {
+            const diffX = e.changedTouches[0].clientX - touchStartX;
+            const diffY = e.changedTouches[0].clientY - touchStartY;
+
+            // Horizontal swipe to navigate when not heavily zoomed
+            if (currentZoom <= 1.2 && Math.abs(diffX) > 50 && Math.abs(diffY) < 100) {
+                if (diffX < 0) {
+                    navigateLightboxPage(1);
+                } else {
+                    navigateLightboxPage(-1);
+                }
+            }
+        }
+        isTouchDragging = false;
+        initialPinchDist = 0;
     });
 
     // Double click toggle zoom
@@ -1386,6 +1490,8 @@ function openPdfPagesForProject(projId) {
     window.openProjectPdfInLightbox = openProjectPdfInLightbox;
     window.openCurrentPdfPageInLightbox = openCurrentPdfPageInLightbox;
     window.openPdfPagesForProject = openPdfPagesForProject;
+    window.openSummarySlidesModal = openSummarySlidesModal;
+    window.openRoadMapModal = openRoadMapModal;
 }
 
 // Filter Event Listeners
