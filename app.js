@@ -740,36 +740,9 @@ function renderDeptBar() {
     container.innerHTML = barHTML + legendHTML;
 }
 
-// Dynamic update for type filter pill counts based on active department & search
-function updateDynamicTagCounts() {
-    const deptProjects = projectsData.filter(p => {
-        if (activeDept !== 'all' && p.dept !== activeDept) return false;
-        if (currentSearch.trim() !== '') {
-            const query = currentSearch.toLowerCase();
-            const matchTitle = p.title.toLowerCase().includes(query);
-            const matchLocation = (p.location || '').toLowerCase().includes(query);
-            const matchDept = p.dept.toLowerCase().includes(query);
-            const matchPurpose = (p.purpose || '').toLowerCase().includes(query);
-            if (!matchTitle && !matchLocation && !matchDept && !matchPurpose) return false;
-        }
-        return true;
-    });
-
-    const countCheck = deptProjects.filter(p => p.tags.includes('지속추진') || p.tags.includes('점검사업')).length;
-    const countSupp = deptProjects.filter(p => p.tags.includes('2회추경')).length;
-
-    const checkSpan = document.getElementById('count-tag-check');
-    const suppSpan = document.getElementById('count-tag-supp');
-
-    if (checkSpan) checkSpan.textContent = countCheck;
-    if (suppSpan) suppSpan.textContent = countSupp;
-}
-
-// Render Project Cards Grid or Table View based on currentView
+// Render Project Cards Grid
 function renderProjects() {
-    updateDynamicTagCounts();
-    const cardContainer = document.getElementById('project-cards-container');
-    const tableContainer = document.getElementById('project-table-container');
+    const container = document.getElementById('project-cards-container');
     const emptyState = document.getElementById('empty-state');
 
     // Filter Logic
@@ -786,99 +759,84 @@ function renderProjects() {
             const matchLocation = (p.location || '').toLowerCase().includes(query);
             const matchDept = p.dept.toLowerCase().includes(query);
             const matchPurpose = (p.purpose || '').toLowerCase().includes(query);
-            const matchScope = (p.scope || '').toLowerCase().includes(query);
-            const matchNo = (p.no || '').toLowerCase().includes(query);
-            if (!matchTitle && !matchLocation && !matchDept && !matchPurpose && !matchScope && !matchNo) return false;
+            if (!matchTitle && !matchLocation && !matchDept && !matchPurpose) return false;
         }
 
         return true;
     });
 
     if (filtered.length === 0) {
-        if (cardContainer) cardContainer.innerHTML = '';
-        if (tableContainer) tableContainer.innerHTML = '';
-        if (emptyState) emptyState.style.display = 'flex';
+        container.innerHTML = '';
+        emptyState.style.display = 'flex';
         return;
     }
 
-    if (emptyState) emptyState.style.display = 'none';
+    emptyState.style.display = 'none';
 
-    if (currentView === 'card') {
-        if (cardContainer) cardContainer.style.display = '';
-        if (tableContainer) tableContainer.style.display = 'none';
+    container.innerHTML = filtered.map(p => {
+        const tagsHTML = p.tags.map(t => `<span class="tag-badge badge-${t}">${t}</span>`).join('');
+        const pdfLabel = p.pdfPageLabel || `P.${p.pdfPage || 1}`;
+        const pdfUrl = `${RAW_PDF_FILENAME}#page=${p.pdfPage || 1}`;
 
-        cardContainer.innerHTML = filtered.map(p => {
-            const tagsHTML = p.tags.map(t => `<span class="tag-badge badge-${t}">${t}</span>`).join('');
-            const pdfLabel = p.pdfPageLabel || `P.${p.pdfPage || 1}`;
-            const pdfUrl = `${RAW_PDF_FILENAME}#page=${p.pdfPage || 1}`;
-
-            return `
-                <article class="project-card">
-                    <div class="card-header-bar">
-                        <div class="card-no-group">
-                            <span class="card-no-badge">${p.no}</span>
-                        </div>
-                        <div class="card-tags">${tagsHTML}</div>
+        return `
+            <article class="project-card">
+                <div class="card-header-bar">
+                    <div class="card-no-group">
+                        <span class="card-no-badge">${p.no}</span>
+                        <span class="card-pdf-pill" title="원본 PDF ${pdfLabel} 확대보기" onclick="event.stopPropagation(); openPdfPagesForProject('${p.id}')">
+                            📄 PDF ${pdfLabel}
+                        </span>
                     </div>
+                    <div class="card-tags">${tagsHTML}</div>
+                </div>
 
-                    <div class="card-body">
-                        <!-- Project Title Clickable -> Triggers Detail Modal -->
-                        <a class="card-title-link" onclick="openDetailModal('${p.id}')" title="사업 상세 정보 보기">
-                            <span>${p.title}</span>
-                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
-                        </a>
+                <div class="card-body">
+                    <!-- Project Title Clickable -> Triggers Detail Modal -->
+                    <a class="card-title-link" onclick="openDetailModal('${p.id}')" title="사업 상세 정보 보기">
+                        <span>${p.title}</span>
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
+                    </a>
 
-                        <div class="card-meta-list">
-                            <div class="meta-row">
-                                <span class="meta-label">담당부서</span>
-                                <span class="meta-val">${p.dept} (☎${p.phone})</span>
-                            </div>
-                            <div class="meta-row">
-                                <span class="meta-label">사업위치</span>
-                                <span class="meta-val">${p.location}</span>
-                            </div>
-                            <div class="meta-row">
-                                <span class="meta-label">총사업비</span>
-                                <span class="meta-val highlight-budget">${p.budgetTotal}</span>
-                            </div>
-                            <div class="meta-row">
-                                <span class="meta-label">사업규모</span>
-                                <span class="meta-val">${p.scope}</span>
-                            </div>
+                    <div class="card-meta-list">
+                        <div class="meta-row">
+                            <span class="meta-label">담당부서</span>
+                            <span class="meta-val">${p.dept} (☎${p.phone})</span>
                         </div>
-
-                        <!-- Reference Photo Thumbnail Clickable -> Triggers Image Lightbox -->
-                        <div class="card-image-box" onclick="openLightbox('${p.image}', '${escapeHtml(p.title)} - 참고사진')" title="클릭하면 큰 사진으로 확대합니다">
-                            <img src="${p.image}" alt="${p.imageCaption || p.title}" loading="lazy">
-                            <div class="card-image-overlay">
-                                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/><line x1="11" y1="8" x2="11" y2="14"/><line x1="8" y1="11" x2="14" y2="11"/></svg>
-                                <span>참고사진 확대보기</span>
-                            </div>
+                        <div class="meta-row">
+                            <span class="meta-label">사업위치</span>
+                            <span class="meta-val">${p.location}</span>
+                        </div>
+                        <div class="meta-row">
+                            <span class="meta-label">총사업비</span>
+                            <span class="meta-val highlight-budget">${p.budgetTotal}</span>
+                        </div>
+                        <div class="meta-row">
+                            <span class="meta-label">사업규모</span>
+                            <span class="meta-val">${p.scope}</span>
                         </div>
                     </div>
 
-                    <div class="card-footer">
-                        <button class="btn btn-outline" onclick="openDetailModal('${p.id}')">
-                            상세 현황 보기
-                        </button>
-                        <button class="btn btn-pdf-pill" onclick="openProjectPdfInLightbox('${p.id}')" title="${escapeHtml(p.title)} 원본 PDF 확대보기">
-                            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
-                                <polyline points="14 2 14 8 20 8"/>
-                                <line x1="16" y1="13" x2="8" y2="13"/>
-                                <line x1="16" y1="17" x2="8" y2="17"/>
-                            </svg>
-                            <span>원본 PDF (${p.pdfPageLabel || ('P.' + (p.pdfPage || 1))})</span>
-                        </button>
+                    <!-- Reference Photo Thumbnail Clickable -> Triggers Image Lightbox -->
+                    <div class="card-image-box" onclick="openLightbox('${p.image}', '${escapeHtml(p.title)} - 참고사진')" title="클릭하면 큰 사진으로 확대합니다">
+                        <img src="${p.image}" alt="${p.imageCaption || p.title}" loading="lazy">
+                        <div class="card-image-overlay">
+                            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/><line x1="11" y1="8" x2="11" y2="14"/><line x1="8" y1="11" x2="14" y2="11"/></svg>
+                            <span>참고사진 확대보기</span>
+                        </div>
                     </div>
-                </article>
-            `;
-        }).join('');
-    } else {
-        if (cardContainer) cardContainer.style.display = 'none';
-        if (tableContainer) tableContainer.style.display = '';
-        renderTableView(filtered);
-    }
+                </div>
+
+                <div class="card-footer">
+                    <button class="btn btn-outline" onclick="openDetailModal('${p.id}')">
+                        상세 현황 보기
+                    </button>
+                    <button type="button" class="btn btn-pdf" onclick="event.stopPropagation(); openPdfPagesForProject('${p.id}')" title="원본 PDF ${pdfLabel} 바로 확대보기">
+                        📄 원본 PDF
+                    </button>
+                </div>
+            </article>
+        `;
+    }).join('');
 }
 
 // View Mode State
@@ -887,13 +845,36 @@ let currentView = 'card';
 // Switch between Card and Table view
 function switchView(mode) {
     currentView = mode;
+    const cardContainer = document.getElementById('project-cards-container');
+    const tableContainer = document.getElementById('project-table-container');
     const cardBtn = document.getElementById('view-card-btn');
     const tableBtn = document.getElementById('view-table-btn');
 
-    if (cardBtn) cardBtn.classList.toggle('active', mode === 'card');
-    if (tableBtn) tableBtn.classList.toggle('active', mode === 'table');
+    if (mode === 'card') {
+        cardContainer.style.display = '';
+        tableContainer.style.display = 'none';
+        cardBtn.classList.add('active');
+        tableBtn.classList.remove('active');
+    } else {
+        cardContainer.style.display = 'none';
+        tableContainer.style.display = '';
+        cardBtn.classList.remove('active');
+        tableBtn.classList.add('active');
 
-    renderProjects();
+        const filtered = projectsData.filter(p => {
+            if (activeDept !== 'all' && p.dept !== activeDept) return false;
+            if (activeTag !== 'all' && !p.tags.includes(activeTag)) return false;
+            if (currentSearch.trim() !== '') {
+                const query = currentSearch.toLowerCase();
+                if (!p.title.toLowerCase().includes(query) &&
+                    !(p.location || '').toLowerCase().includes(query) &&
+                    !p.dept.toLowerCase().includes(query) &&
+                    !(p.purpose || '').toLowerCase().includes(query)) return false;
+            }
+            return true;
+        });
+        renderTableView(filtered);
+    }
 }
 
 // Render Table View — 보고서 형식 (사업유형 / 주요내용 / 참고사진)
@@ -906,9 +887,13 @@ function renderTableView(filtered) {
         return;
     }
 
-    const ALL_TAG_TYPES = ['지속추진', '2회추경'];
+    const ALL_TAG_TYPES = ['지속추진', '점검사업', '2회추경'];
 
-    const rows = filtered.map(p => {
+    // Filter to only projects that have at least one of the defined type tags
+    const typeFiltered = filtered.filter(p => {
+        return p.tags.some(tag => ['지속추진', '점검사업', '2회추경'].includes(tag));
+    });
+    const rows = typeFiltered.map(p => {
         // 사업유형 열: 각 유형별 체크박스 표시
         const typeChecks = ALL_TAG_TYPES
             .filter(t => p.tags.includes(t))
@@ -1168,19 +1153,11 @@ let startY = 0;
 function updateZoomTransform() {
     const wrapper = document.getElementById('lightbox-img-wrapper');
     const badge = document.getElementById('zoom-level-badge');
-    const lightbox = document.getElementById('lightbox-modal');
     if (wrapper) {
         wrapper.style.transform = `translate(${currentTranslateX}px, ${currentTranslateY}px) scale(${currentZoom})`;
     }
     if (badge) {
         badge.textContent = `${Math.round(currentZoom * 100)}%`;
-    }
-    if (lightbox) {
-        if (Math.abs(currentZoom - 1.0) > 0.05) {
-            lightbox.classList.add('is-zoomed');
-        } else {
-            lightbox.classList.remove('is-zoomed');
-        }
     }
 }
 
@@ -1218,82 +1195,61 @@ function toggleNativeFullscreen() {
     }
 }
 
-// Summary Slides Dataset (요약_1-1.jpg ~ 요약_8.jpg)
-const SUMMARY_SLIDES = [
-    { src: "요약/요약_1-1.jpg", title: "교통국 중점 추진사업 요약", caption: "사업 요약 (1/9 페이지)", label: "1페이지" },
-    { src: "요약/요약_1-2.jpg", title: "교통국 중점 추진사업 요약", caption: "사업 요약 (2/9 페이지)", label: "2페이지" },
-    { src: "요약/요약_2.jpg", title: "교통국 중점 추진사업 요약", caption: "사업 요약 (3/9 페이지)", label: "3페이지" },
-    { src: "요약/요약_3.jpg", title: "교통국 중점 추진사업 요약", caption: "사업 요약 (4/9 페이지)", label: "4페이지" },
-    { src: "요약/요약_4.jpg", title: "교통국 중점 추진사업 요약", caption: "사업 요약 (5/9 페이지)", label: "5페이지" },
-    { src: "요약/요약_5.jpg", title: "교통국 중점 추진사업 요약", caption: "사업 요약 (6/9 페이지)", label: "6페이지" },
-    { src: "요약/요약_6.jpg", title: "교통국 중점 추진사업 요약", caption: "사업 요약 (7/9 페이지)", label: "7페이지" },
-    { src: "요약/요약_7.jpg", title: "교통국 중점 추진사업 요약", caption: "사업 요약 (8/9 페이지)", label: "8페이지" },
-    { src: "요약/요약_8.jpg", title: "교통국 중점 추진사업 요약", caption: "사업 요약 (9/9 페이지)", label: "9페이지" }
-];
-
-let lightboxItemsList = [];
+let lightboxPagesList = [];
 let lightboxPageIndex = 0;
 let lightboxBaseTitle = "";
 
-function openGalleryLightbox(items, startIndex = 0, baseTitle = "") {
-    lightboxItemsList = items || [];
-    lightboxPageIndex = Math.min(Math.max(startIndex, 0), Math.max(0, lightboxItemsList.length - 1));
-    lightboxBaseTitle = baseTitle || "";
-
-    const lightbox = document.getElementById('lightbox-modal');
-    const wrap = document.getElementById('lightbox-bottom-controls-wrap');
-
-    if (wrap) wrap.classList.remove('hover-active');
-
-    if (lightbox) {
-        lightbox.classList.add('active');
-        lightbox.classList.add('is-fullscreen-active');
-        lightbox.setAttribute('aria-hidden', 'false');
-
-        if (!document.fullscreenElement) {
-            if (lightbox.requestFullscreen) {
-                lightbox.requestFullscreen().catch(() => {});
-            } else if (lightbox.webkitRequestFullscreen) {
-                lightbox.webkitRequestFullscreen();
-            }
-        }
-    }
-    document.body.style.overflow = 'hidden';
-
-    renderCurrentLightboxSlide();
-}
-
-function openSummarySlidesModal(startIndex = 0) {
-    openGalleryLightbox(SUMMARY_SLIDES, startIndex, "교통국 중점사업 요약");
-}
-
 function openLightbox(imgSrc, caption, pagesList = null, pageIndex = 0, baseTitle = "") {
-    if (pagesList && Array.isArray(pagesList) && pagesList.length > 0) {
-        const items = pagesList.map((pg, idx) => ({
-            src: `assets/pdf_pages/page_${pg}.png`,
-            title: baseTitle || caption || '원본 PDF',
-            caption: `${baseTitle || caption} - 원본 PDF 보고서 (P.${pg}) (${idx + 1}/${pagesList.length})`,
-            label: `P.${pg}`
-        }));
-        openGalleryLightbox(items, pageIndex, baseTitle || caption);
+    const lightbox = document.getElementById('lightbox-modal');
+    const imgEl = document.getElementById('lightbox-img');
+    const captionEl = document.getElementById('lightbox-caption');
+    const downloadLink = document.getElementById('lightbox-download-link');
+    const titleEl = document.getElementById('lightbox-title');
+    const prevBtn = document.getElementById('lightbox-prev-btn');
+    const nextBtn = document.getElementById('lightbox-next-btn');
+
+    lightboxPagesList = pagesList || [];
+    lightboxPageIndex = pageIndex;
+    lightboxBaseTitle = baseTitle || caption || "";
+
+    imgEl.src = imgSrc;
+    captionEl.textContent = caption || '참고사진';
+    titleEl.textContent = caption ? `${caption} 확대보기` : '참고사진 확대보기';
+    downloadLink.href = imgSrc;
+    downloadLink.setAttribute('download', (caption || 'project_photo').replace(/[\/\?%*:|"<>]/g, '_') + '.png');
+
+    // Multi-page navigation buttons (이전 페이지 / 다음 페이지)
+    if (lightboxPagesList && lightboxPagesList.length > 1) {
+        if (prevBtn) {
+            prevBtn.style.display = 'flex';
+            prevBtn.disabled = (lightboxPageIndex <= 0);
+        }
+        if (nextBtn) {
+            nextBtn.style.display = 'flex';
+            nextBtn.disabled = (lightboxPageIndex >= lightboxPagesList.length - 1);
+        }
     } else {
-        const items = [{
-            src: imgSrc,
-            title: baseTitle || caption || '참고사진',
-            caption: caption || '참고사진',
-            label: '1'
-        }];
-        openGalleryLightbox(items, 0, baseTitle || caption);
+        if (prevBtn) prevBtn.style.display = 'none';
+        if (nextBtn) nextBtn.style.display = 'none';
     }
+
+    resetZoom();
+
+    lightbox.classList.add('active');
+    lightbox.setAttribute('aria-hidden', 'false');
+    document.body.style.overflow = 'hidden';
 }
 
-function renderCurrentLightboxSlide() {
-    if (!lightboxItemsList || lightboxItemsList.length === 0) return;
+function navigateLightboxPage(delta) {
+    if (!lightboxPagesList || lightboxPagesList.length <= 1) return;
+    
+    const newIdx = lightboxPageIndex + delta;
+    if (newIdx < 0 || newIdx >= lightboxPagesList.length) return;
 
-    const currentItem = lightboxItemsList[lightboxPageIndex];
-    const imgSrc = typeof currentItem === 'string' ? currentItem : currentItem.src;
-    const captionText = typeof currentItem === 'object' && currentItem.caption ? currentItem.caption : `${lightboxBaseTitle} (${lightboxPageIndex + 1}/${lightboxItemsList.length})`;
-    const titleText = typeof currentItem === 'object' && currentItem.title ? currentItem.title : (lightboxBaseTitle || '확대보기');
+    lightboxPageIndex = newIdx;
+    const pg = lightboxPagesList[lightboxPageIndex];
+    const pageImgSrc = `assets/pdf_pages/page_${pg}.png`;
+    const caption = `${lightboxBaseTitle} - 원본 PDF 보고서 (P.${pg}) (${lightboxPageIndex + 1}/${lightboxPagesList.length})`;
 
     const imgEl = document.getElementById('lightbox-img');
     const captionEl = document.getElementById('lightbox-caption');
@@ -1301,70 +1257,31 @@ function renderCurrentLightboxSlide() {
     const titleEl = document.getElementById('lightbox-title');
     const prevBtn = document.getElementById('lightbox-prev-btn');
     const nextBtn = document.getElementById('lightbox-next-btn');
-    const paginationDots = document.getElementById('lightbox-pagination-dots');
 
-    imgEl.src = imgSrc;
-    captionEl.textContent = captionText;
-    titleEl.textContent = titleText.includes('(') ? titleText : `${titleText} (${lightboxPageIndex + 1}/${lightboxItemsList.length})`;
-    downloadLink.href = imgSrc;
-    downloadLink.setAttribute('download', `${titleText}_slide_${lightboxPageIndex + 1}.png`.replace(/[\/\?%*:|"<>]/g, '_'));
+    imgEl.src = pageImgSrc;
+    captionEl.textContent = caption;
+    titleEl.textContent = `${lightboxBaseTitle} - 원본 PDF 보고서 (P.${pg}) 확대보기`;
+    downloadLink.href = pageImgSrc;
+    downloadLink.setAttribute('download', `${lightboxBaseTitle}_P${pg}.png`.replace(/[\/\?%*:|"<>]/g, '_'));
 
-    if (lightboxItemsList.length > 1) {
-        if (prevBtn) {
-            prevBtn.style.display = 'flex';
-            prevBtn.disabled = (lightboxPageIndex <= 0);
-        }
-        if (nextBtn) {
-            nextBtn.style.display = 'flex';
-            nextBtn.disabled = (lightboxPageIndex >= lightboxItemsList.length - 1);
-        }
-
-        if (paginationDots) {
-            paginationDots.style.display = 'flex';
-            paginationDots.innerHTML = lightboxItemsList.map((item, idx) => {
-                const label = item.label || `슬라이드 ${idx + 1}`;
-                const isActive = (idx === lightboxPageIndex) ? 'active' : '';
-                return `<button type="button" class="lightbox-dot-pill ${isActive}" onclick="event.stopPropagation(); goToLightboxSlide(${idx});">${label}</button>`;
-            }).join('');
-        }
-    } else {
-        if (prevBtn) prevBtn.style.display = 'none';
-        if (nextBtn) nextBtn.style.display = 'none';
-        if (paginationDots) paginationDots.style.display = 'none';
-    }
+    if (prevBtn) prevBtn.disabled = (lightboxPageIndex <= 0);
+    if (nextBtn) nextBtn.disabled = (lightboxPageIndex >= lightboxPagesList.length - 1);
 
     resetZoom();
-}
-
-function goToLightboxSlide(index) {
-    if (!lightboxItemsList || index < 0 || index >= lightboxItemsList.length) return;
-    lightboxPageIndex = index;
-    renderCurrentLightboxSlide();
-}
-
-function navigateLightboxPage(delta) {
-    if (!lightboxItemsList || lightboxItemsList.length <= 1) return;
-    const newIdx = lightboxPageIndex + delta;
-    if (newIdx < 0 || newIdx >= lightboxItemsList.length) return;
-    goToLightboxSlide(newIdx);
 }
 
 function closeLightbox() {
     const lightbox = document.getElementById('lightbox-modal');
     lightbox.classList.remove('active');
-    lightbox.classList.remove('is-fullscreen-active');
     lightbox.setAttribute('aria-hidden', 'true');
     resetZoom();
-
-    const wrap = document.getElementById('lightbox-bottom-controls-wrap');
-    if (wrap) wrap.classList.remove('hover-active');
 
     if (document.fullscreenElement) {
         if (document.exitFullscreen) document.exitFullscreen();
     }
 
     const detailModal = document.getElementById('detail-modal');
-    if (!detailModal || !detailModal.classList.contains('active')) {
+    if (!detailModal.classList.contains('active')) {
         document.body.style.overflow = '';
     }
 }
@@ -1383,7 +1300,7 @@ function initLightboxInteractions() {
 
     // Drag to pan
     stage.addEventListener('mousedown', (e) => {
-        if (e.target.closest('.lightbox-toolbar') || e.target.closest('.lightbox-fullscreen-bar') || e.target.closest('.lightbox-nav-btn') || e.target.closest('.lightbox-pagination-dots')) return;
+        if (e.target.closest('.lightbox-toolbar') || e.target.closest('.lightbox-fullscreen-bar') || e.target.closest('.lightbox-nav-btn')) return;
         isDragging = true;
         startX = e.clientX - currentTranslateX;
         startY = e.clientY - currentTranslateY;
@@ -1406,7 +1323,7 @@ function initLightboxInteractions() {
 
     // Double click toggle zoom
     stage.addEventListener('dblclick', (e) => {
-        if (e.target.closest('.lightbox-toolbar') || e.target.closest('.lightbox-fullscreen-bar') || e.target.closest('.lightbox-nav-btn') || e.target.closest('.lightbox-pagination-dots')) return;
+        if (e.target.closest('.lightbox-toolbar') || e.target.closest('.lightbox-fullscreen-bar') || e.target.closest('.lightbox-nav-btn')) return;
         if (currentZoom === 1.0) {
             currentZoom = 2.0;
         } else {
@@ -1416,44 +1333,16 @@ function initLightboxInteractions() {
         updateZoomTransform();
     });
 
-    const lightboxModal = document.getElementById('lightbox-modal');
-    const bottomControlsWrap = document.getElementById('lightbox-bottom-controls-wrap');
-
-    if (lightboxModal && bottomControlsWrap) {
-        window.addEventListener('mousemove', (e) => {
-            if (!lightboxModal.classList.contains('active')) return;
-            // Check if mouse is in the bottom area (bottom 140px of screen)
-            const isBottomArea = e.clientY >= (window.innerHeight - 140);
-            if (isBottomArea) {
-                bottomControlsWrap.classList.add('hover-active');
-            } else {
-                bottomControlsWrap.classList.remove('hover-active');
-            }
-        });
-
-        document.addEventListener('fullscreenchange', () => {
-            if (document.fullscreenElement) {
-                lightboxModal.classList.add('is-fullscreen-active');
-            } else {
-                lightboxModal.classList.remove('is-fullscreen-active');
-            }
-            bottomControlsWrap.classList.remove('hover-active');
-        });
-    }
-
     // Keyboard navigation (Arrow keys & Escape)
     window.addEventListener('keydown', (e) => {
         const lightbox = document.getElementById('lightbox-modal');
         if (!lightbox || !lightbox.classList.contains('active')) return;
 
-        if (e.key === 'ArrowLeft' || e.key === 'PageUp') {
-            e.preventDefault();
+        if (e.key === 'ArrowLeft') {
             navigateLightboxPage(-1);
-        } else if (e.key === 'ArrowRight' || e.key === 'PageDown') {
-            e.preventDefault();
+        } else if (e.key === 'ArrowRight') {
             navigateLightboxPage(1);
         } else if (e.key === 'Escape') {
-            e.preventDefault();
             closeLightbox();
         }
     });
@@ -1470,7 +1359,8 @@ function openProjectPdfInLightbox(projId, startPageIndex = 0) {
     if (!project) return;
     const pages = project.pdfPages || [project.pdfPage || 1];
     const pageIndex = Math.min(Math.max(startPageIndex, 0), pages.length - 1);
-    openLightbox('', project.title, pages, pageIndex, project.title);
+    const pg = pages[pageIndex];
+    openPdfPage(pg, project.title, pages, pageIndex);
 }
 
 function openCurrentPdfPageInLightbox() {
@@ -1484,19 +1374,11 @@ function openPdfPagesForProject(projId) {
     switchModalTab('pdf');
 }
 
-function openRoadMapModal() {
-    openLightbox('road_map/road_map.jpg', '교통국 중점 도로 사업 지도');
-}
-
     window.zoomIn = zoomIn;
     window.zoomOut = zoomOut;
     window.resetZoom = resetZoom;
     window.toggleNativeFullscreen = toggleNativeFullscreen;
     window.openLightbox = openLightbox;
-    window.openGalleryLightbox = openGalleryLightbox;
-    window.openSummarySlidesModal = openSummarySlidesModal;
-    window.openRoadMapModal = openRoadMapModal;
-    window.goToLightboxSlide = goToLightboxSlide;
     window.closeLightbox = closeLightbox;
     window.navigateLightboxPage = navigateLightboxPage;
     window.openLightboxFromModal = openLightboxFromModal;
