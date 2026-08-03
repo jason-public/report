@@ -117,8 +117,33 @@ function renderDeptBar() {
     container.innerHTML = barHTML + legendHTML;
 }
 
+function updateTagPillCounts() {
+    const deptAndSearchFiltered = projectsData.filter(p => {
+        if (activeDept !== 'all' && p.dept !== activeDept) return false;
+        if (currentSearch.trim() !== '') {
+            const query = currentSearch.toLowerCase();
+            const matchTitle = p.title.toLowerCase().includes(query);
+            const matchLocation = (p.location || '').toLowerCase().includes(query);
+            const matchDept = p.dept.toLowerCase().includes(query);
+            const matchPurpose = (p.purpose || '').toLowerCase().includes(query);
+            if (!matchTitle && !matchLocation && !matchDept && !matchPurpose) return false;
+        }
+        return true;
+    });
+
+    const checkCount = deptAndSearchFiltered.filter(p => p.tags && p.tags.includes('지속추진')).length;
+    const suppCount = deptAndSearchFiltered.filter(p => p.tags && p.tags.includes('2회추경')).length;
+
+    const elCheck = document.getElementById('count-tag-check');
+    const elSupp = document.getElementById('count-tag-supp');
+
+    if (elCheck) elCheck.textContent = checkCount;
+    if (elSupp) elSupp.textContent = suppCount;
+}
+
 // Render Project Cards Grid
 function renderProjects() {
+    updateTagPillCounts();
     const container = document.getElementById('project-cards-container');
     const emptyState = document.getElementById('empty-state');
 
@@ -136,15 +161,26 @@ function renderProjects() {
             const matchLocation = (p.location || '').toLowerCase().includes(query);
             const matchDept = p.dept.toLowerCase().includes(query);
             const matchPurpose = (p.purpose || '').toLowerCase().includes(query);
-            if (!matchTitle && !matchLocation && !matchDept && !matchPurpose) return false;
+            const matchScope = (p.scope || '').toLowerCase().includes(query);
+            const matchNo = (p.no || '').toLowerCase().includes(query);
+            const matchAchievements = (p.achievements || []).some(a => {
+                const text = typeof a === 'object' ? (a.text || '') : a;
+                return text.toLowerCase().includes(query);
+            });
+            if (!matchTitle && !matchLocation && !matchDept && !matchPurpose && !matchScope && !matchNo && !matchAchievements) return false;
         }
 
         return true;
     });
 
+    // Render Table View with the filtered list
+    renderTableView(filtered);
+
     if (filtered.length === 0) {
         container.innerHTML = '';
-        emptyState.style.display = 'flex';
+        if (currentView === 'card') {
+            emptyState.style.display = 'flex';
+        }
         return;
     }
 
@@ -237,21 +273,8 @@ function switchView(mode) {
         tableContainer.style.display = '';
         cardBtn.classList.remove('active');
         tableBtn.classList.add('active');
-
-        const filtered = projectsData.filter(p => {
-            if (activeDept !== 'all' && p.dept !== activeDept) return false;
-            if (activeTag !== 'all' && !p.tags.includes(activeTag)) return false;
-            if (currentSearch.trim() !== '') {
-                const query = currentSearch.toLowerCase();
-                if (!p.title.toLowerCase().includes(query) &&
-                    !(p.location || '').toLowerCase().includes(query) &&
-                    !p.dept.toLowerCase().includes(query) &&
-                    !(p.purpose || '').toLowerCase().includes(query)) return false;
-            }
-            return true;
-        });
-        renderTableView(filtered);
     }
+    renderProjects();
 }
 
 // Render Table View — 보고서 형식 (사업유형 / 주요내용 / 참고사진)
@@ -664,11 +687,18 @@ function openLightbox(imgSrc, caption, pagesList = null, pageIndex = 0, baseTitl
         if (nextBtn) nextBtn.style.display = 'none';
     }
 
-    resetZoom();
-
     lightbox.classList.add('active');
     lightbox.setAttribute('aria-hidden', 'false');
     document.body.style.overflow = 'hidden';
+
+    // Auto-enter native browser fullscreen mode on open
+    if (!document.fullscreenElement) {
+        if (lightbox.requestFullscreen) {
+            lightbox.requestFullscreen().catch(() => {});
+        } else if (lightbox.webkitRequestFullscreen) {
+            lightbox.webkitRequestFullscreen();
+        }
+    }
 }
 
 function navigateLightboxPage(delta) {
@@ -860,6 +890,68 @@ function initLightboxInteractions() {
         }
     });
 
+    // Auto-hide controls & toolbar in Lightbox until mouse hovers over target regions
+    const lightboxModalEl = document.getElementById('lightbox-modal');
+    if (lightboxModalEl) {
+        lightboxModalEl.addEventListener('mousemove', (e) => {
+            const bottomWrap = document.getElementById('lightbox-bottom-controls-wrap');
+            const topBar = document.querySelector('.lightbox-fullscreen-bar');
+            const prevBtn = document.getElementById('lightbox-prev-btn');
+            const nextBtn = document.getElementById('lightbox-next-btn');
+
+            const windowHeight = window.innerHeight;
+            const windowWidth = window.innerWidth;
+            const mouseY = e.clientY;
+            const mouseX = e.clientX;
+
+            // Bottom hover: within 130px from bottom edge
+            if (bottomWrap) {
+                if (windowHeight - mouseY <= 130) {
+                    bottomWrap.classList.add('hover-active');
+                } else {
+                    bottomWrap.classList.remove('hover-active');
+                }
+            }
+
+            // Top hover: within 90px from top edge
+            if (topBar) {
+                if (mouseY <= 90) {
+                    topBar.classList.add('hover-active');
+                } else {
+                    topBar.classList.remove('hover-active');
+                }
+            }
+
+            // Left edge hover for prev button (within 140px from left edge)
+            if (prevBtn && prevBtn.style.display !== 'none') {
+                if (mouseX <= 140) {
+                    prevBtn.classList.add('hover-active');
+                } else {
+                    prevBtn.classList.remove('hover-active');
+                }
+            }
+
+            // Right edge hover for next button (within 140px from right edge)
+            if (nextBtn && nextBtn.style.display !== 'none') {
+                if (windowWidth - mouseX <= 140) {
+                    nextBtn.classList.add('hover-active');
+                } else {
+                    nextBtn.classList.remove('hover-active');
+                }
+            }
+        });
+
+        // Touch tap toggle for controls on mobile / tablets
+        lightboxModalEl.addEventListener('click', (e) => {
+            if (e.target.id === 'lightbox-stage' || e.target.id === 'lightbox-img' || e.target.id === 'lightbox-img-wrapper') {
+                const bottomWrap = document.getElementById('lightbox-bottom-controls-wrap');
+                const topBar = document.querySelector('.lightbox-fullscreen-bar');
+                if (bottomWrap) bottomWrap.classList.toggle('hover-active');
+                if (topBar) topBar.classList.toggle('hover-active');
+            }
+        });
+    }
+
 function openPdfPage(pageNum, title, pagesList = null, pageIndex = 0) {
     const pageImgSrc = `assets/pdf_pages/page_${pageNum}.png`;
     const totalCount = (pagesList && pagesList.length > 1) ? ` (${pageIndex + 1}/${pagesList.length})` : '';
@@ -883,8 +975,7 @@ function openCurrentPdfPageInLightbox() {
 }
 
 function openPdfPagesForProject(projId) {
-    openDetailModal(projId);
-    switchModalTab('pdf');
+    openProjectPdfInLightbox(projId, 0);
 }
 
     window.zoomIn = zoomIn;
