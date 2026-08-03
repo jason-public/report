@@ -577,6 +577,18 @@ let lightboxPageIndex = 0;
 let lightboxBaseTitle = "";
 
 const SUMMARY_SLIDES_LIST = [
+    '요약/요약_1-1.jpg',
+    '요약/요약_1-2.jpg',
+    '요약/요약_2.jpg',
+    '요약/요약_3.jpg',
+    '요약/요약_4.jpg',
+    '요약/요약_5.jpg',
+    '요약/요약_6.jpg',
+    '요약/요약_7.jpg',
+    '요약/요약_8.jpg'
+];
+
+const SUMMARY_SLIDES_FALLBACK = [
     'assets/summary/slide_1.jpg',
     'assets/summary/slide_2.jpg',
     'assets/summary/slide_3.jpg',
@@ -600,7 +612,7 @@ function openSummarySlidesModal() {
 
 function openRoadMapModal() {
     openLightbox(
-        'assets/road_map/road_map.jpg',
+        'road_map/road_map.jpg',
         '교통국 도로 사업 지도',
         null,
         0,
@@ -620,6 +632,16 @@ function openLightbox(imgSrc, caption, pagesList = null, pageIndex = 0, baseTitl
     lightboxPagesList = pagesList || [];
     lightboxPageIndex = pageIndex;
     lightboxBaseTitle = baseTitle || caption || "";
+
+    imgEl.onerror = function() {
+        if (imgSrc === 'road_map/road_map.jpg') {
+            imgEl.src = 'assets/road_map/road_map.jpg';
+        } else if (imgSrc.startsWith('요약/')) {
+            const fallbackSrc = SUMMARY_SLIDES_FALLBACK[lightboxPageIndex] || 'assets/summary/slide_1.jpg';
+            imgEl.src = fallbackSrc;
+        }
+        imgEl.onerror = null;
+    };
 
     imgEl.src = imgSrc;
     captionEl.textContent = caption || '참고사진';
@@ -678,6 +700,16 @@ function navigateLightboxPage(delta) {
     const titleEl = document.getElementById('lightbox-title');
     const prevBtn = document.getElementById('lightbox-prev-btn');
     const nextBtn = document.getElementById('lightbox-next-btn');
+
+    imgEl.onerror = function() {
+        if (pageImgSrc === 'road_map/road_map.jpg') {
+            imgEl.src = 'assets/road_map/road_map.jpg';
+        } else if (pageImgSrc.startsWith('요약/')) {
+            const fallbackSrc = SUMMARY_SLIDES_FALLBACK[lightboxPageIndex] || 'assets/summary/slide_1.jpg';
+            imgEl.src = fallbackSrc;
+        }
+        imgEl.onerror = null;
+    };
 
     imgEl.src = pageImgSrc;
     captionEl.textContent = caption;
